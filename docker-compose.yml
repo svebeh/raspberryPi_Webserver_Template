@@ -1,0 +1,91 @@
+version: "3.3"
+
+services:
+
+  traefik:
+    image: "traefik:v2.2"
+    container_name: "traefik"
+    command:
+      - "--api.insecure=true" #<-- Das sollte in PROD deaktiviert werden weil das Dashboard sonst von außen erreichbar ist!!!
+      - "--api.dashboard=true" 
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--log.filePath=/log/traefik/traefik.log" 
+      - "--log.filePath=/log/traefik/access.log"
+        #- "--log.format=json" 
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      # Fuer Development kann man ungueltige Zertifikate über den Link nutzen
+      #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.myresolver.acme.email=webmaster@$DOMAIN" #<-- den forderen Teil der E-Mail ersetzen
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./log/traefik:/log/traefik"
+   
+
+
+  whoami:
+    image: "containous/whoami"
+    container_name: "whoami"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.$DOMAIN`)" #<-- ggf. die Subdomain anpassen
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+
+
+  db:
+    depends_on: 
+      -  traefik 
+    image:  linuxserver/mariadb:arm32v7-latest 
+    container_name:  wp_mariadb 
+    volumes:
+      -  $DBDATA:/config 
+    environment:
+      TZ:  Europe/Berlin 
+      MYSQL_ROOT_PASSWORD: $DBPASSWD 
+      MYSQL_DATABASE:  wordpress 
+    ports:
+      -  3306:3306 
+    networks:
+      -  default 
+    restart:  unless-stopped 
+
+
+
+  wp:
+    depends_on: 
+      -  db 
+    links: 
+      -  db 
+      -  db:wp_mariadb   
+    image:  wordpress:latest 
+    container_name:  wordpress 
+    volumes:
+      -  $WPDATA:/var/www/html 
+    environment:
+      WORDPRESS_DB_HOST:  db:3306 
+      #WORDPRESS_DB_USER:  root  #<-- zum Testen mit root
+      WORDPRESS_DB_PASSWORD: $DBPASSWD 
+      WORDPRESS_DB_NAME:  wordpress   
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wp.rule=Host(`$DOMAIN`, `wordpress.$DOMAIN`)" #<-- ggf. die Subdomain anpassen
+      - "traefik.http.routers.wp.entrypoints=websecure"
+      - "traefik.http.routers.wp.tls.certresolver=myresolver"
+    networks:
+      -  default 
+      -  web 
+    restart:  unless-stopped 
+
+
+networks:
+  web:
+    external: true
