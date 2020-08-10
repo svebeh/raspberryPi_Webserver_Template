@@ -1,6 +1,8 @@
 # raspberryPi_Webserver_Template
 ### Auf dem Raspberry Pi 4 (2GB) einen Webserver mit Traefik, LetsEncrypt, Wordpress und MariaDB in einer Docker-Umgebung laufen lassen. 
 
+### Update 10.08.2020 - Neue Version mit TLS
+
 Seit vielen Jahren hatte ich einen V-Server bei einem Internet Provider gemietet. Der ganze Spaß hatte ca. 10 Euro/mtl. gekostet. Den Server habe ich nun gekündigt.
 
 Jetzt wollte ich wissen, ob es möglich ist, mit wenig Aufwand und zu geringen Kosten einen eigenen Webserver, der aus dem Internet erreichbar ist, zu Hause aufzubauen.
