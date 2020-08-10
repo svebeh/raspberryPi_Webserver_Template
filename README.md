@@ -74,30 +74,18 @@ services:
   traefik:
     image: "traefik:v2.2"
     container_name: "traefik"
-    command:
-      - "--api.insecure=true" #<-- Das sollte in PROD deaktiviert werden weil das Dashboard sonst von außen erreichbar ist!!!
-      - "--api.dashboard=true" 
-      - "--log.level=INFO"
-      - "--accesslog=true"
-      - "--log.filePath=/log/traefik/traefik.log" 
-      - "--log.filePath=/log/traefik/access.log"
-        #- "--log.format=json" 
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      # Fuer Development kann man ungueltige Zertifikate über den Link nutzen
-      #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
-      - "--certificatesresolvers.myresolver.acme.email=webmaster@$DOMAIN" #<-- den forderen Teil der E-Mail ersetzen
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+
     ports:
+      - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./log/traefik:/log/traefik"
-   
+      - "./traefik_data/traefik.yml:/traefik.yml"
+      - "./traefik_data/dynamic.yml:/dynamic.yml"
+      - "/etc/localtime:/etc/localtime:ro"
 
 
   whoami:
@@ -105,11 +93,11 @@ services:
     container_name: "whoami"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.$DOMAIN`)" #<-- ggf. die Subdomain anpassen
+      - "traefik.http.routers.whoami.rule=Host(`whoami.$DOMAIN`)"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.tls.certresolver=myresolver"
 
-
+# Zum testen wird erst einmal der Root genutzt, das muss später unbedingt geändert werden!!!
   db:
     depends_on: 
       -  traefik 
@@ -121,6 +109,8 @@ services:
       TZ:  Europe/Berlin 
       MYSQL_ROOT_PASSWORD: $DBPASSWD 
       MYSQL_DATABASE:  wordpress 
+      #MYSQL_USER: $MYSQL_USER 
+      #MYSQL_PASSWORD: $MYSQL_PASSWORD
     ports:
       -  3306:3306 
     networks:
@@ -128,7 +118,7 @@ services:
     restart:  unless-stopped 
 
 
-
+# Zum testen wird erst einmal der Root genutzt, das muss später unbedingt geändert werden!!!
   wp:
     depends_on: 
       -  db 
@@ -141,14 +131,15 @@ services:
       -  $WPDATA:/var/www/html 
     environment:
       WORDPRESS_DB_HOST:  db:3306 
-      #WORDPRESS_DB_USER:  root  #<-- zum Testen mit root
+      #WORDPRESS_DB_USER:  root 
       WORDPRESS_DB_PASSWORD: $DBPASSWD 
-      WORDPRESS_DB_NAME:  wordpress   
+      WORDPRESS_DB_NAME:  wordpress       
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wp.rule=Host(`$DOMAIN`, `wordpress.$DOMAIN`)" #<-- ggf. die Subdomain anpassen
+      - "traefik.http.routers.wp.rule=Host(`$DOMAIN`, `wordpress.$DOMAIN`, `www.$DOMAIN`)"
       - "traefik.http.routers.wp.entrypoints=websecure"
       - "traefik.http.routers.wp.tls.certresolver=myresolver"
+
     networks:
       -  default 
       -  web 
@@ -158,7 +149,6 @@ services:
 networks:
   web:
     external: true
-
 ```
 
 ### Verschlüsseltes Passwort für das Dashboard erstellen
@@ -173,14 +163,16 @@ echo $(htpasswd -nbB <DeinUsername> "<DeinPasswort>") | sed -e s/\\$/\\$\\$/g
 ```
 ### .env erstellen. (Hier müssen einige Variablen angepasst werden!)
 ```
-LOG_LEVEL=ERROR
+# .env
+#Diese Variablen werden in der docker-compose.yml verwendet. Bitte alles #was zwischen den <> steht entsprechend anpassen
+LOG_LEVEL=DEBUG
 NETWORK_EX=web
 NERWORK_INT=default
 
-DOMAIN=<DEINE_DOMAIN>    #Hier anpassen!
+DOMAIN=<Deine Domain>
 
-##Dashboard config
-DASHBOARD_HOST="http://<DEINE_IP_ADRESSE>:8080/dashboard#/"    #Hier anpassen!
+## dashboard configs
+DASHBOARD_HOST="http://<Deine IP oder Domain>:8080/dashboard#/"
 
 #Traefik
 LOG=./log/traefik
@@ -189,14 +181,61 @@ LOG=./log/traefik
 WPDATA=./wordpress/wp-daten
 DBDATA=./wordpress/db-daten
 
+#Hier später unbedingt einen User und ein Passwort erstellen. NICHT root!
 #db config
-DBUSER=<DEIN_DB_USER>    #Hier anpassen!
-DBPASSWD=<DEIN_DB_PASSWORT>    #Hier anpassen!
+DBUSER=root
+DBPASSWD=<Dein Root Passwort>
 
-#Passwort für Dashboard
-LETSENCRYPT_PW="<DEIN_USER:wefprfew$$ewfon534tgrrgj1$394tgrefRrg5cpyGQ54greroBngIX1."    #Hier anpassen!
+#letsEncrypt Passwort (Das generieren wir im nächsten Schritt.
+LETSENCRYPT_PW="<User:Passwort"
+#Zum Beispiel so:
+#<admin:$$apr1$48Hon55tF3$390fR1D0hdGZs65oBngZR6."
 
 ```
+### traefik.yml erstellen
+```
+log:
+  level: "INFO"
+  filePath: "/log/traefik/traefik.log" 
+
+providers: 
+  docker: #true
+    endpoint: "unix:///var/run/docker.sock"
+    exposedbydefault: false
+  file:
+    filename: "./dynamic.yml"
+    watch: true
+
+entrypoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+  dashboard:
+    address: :8080
+
+api:
+  dashboard: true
+
+certificatesresolvers:
+        myresolver: 
+          acme: 
+          #tlschallenge: true
+            httpChallenge:
+              entryPoint: web
+            email: "<Deine@E-Mail-Adresse>"
+            storage: "/letsencrypt/acme.json"
+            # Benutze Let's Encrypt Staging CA zum testen!
+            # caServer: https://acme-staging-v02.api.letsencrypt.org/directory            
+
+accessLog: {}
+### dynamic.yml erstellen
+```
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+
 
 Wenn das alles erledigt ist, dann wird die Umgebung hochgefahren mit
 ```
