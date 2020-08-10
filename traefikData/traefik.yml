@@ -1,0 +1,36 @@
+#traefik.yml
+log:
+  level: "INFO"
+  filePath: "/log/traefik/traefik.log" 
+
+providers: 
+  docker: #true
+    endpoint: "unix:///var/run/docker.sock"
+    exposedbydefault: false
+  file:
+    filename: "./dynamic.yml"
+    watch: true
+
+entrypoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+  dashboard:
+    address: :8080
+
+api:
+  dashboard: true
+
+certificatesresolvers:
+        myresolver: 
+          acme: 
+          #tlschallenge: true
+            httpChallenge:
+              entryPoint: web
+            email: "<Deine@E-Mail-Adresse>"
+            storage: "/letsencrypt/acme.json"
+            # Benutze Let's Encrypt Staging CA zum testen!
+            # caServer: https://acme-staging-v02.api.letsencrypt.org/directory            
+
+accessLog: {}
