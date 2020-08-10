@@ -47,7 +47,7 @@ docker version
 ```
 
 Eine genauere Anleitung ist auf meiner Webseite zu finden. Dort beschreibe ich auf wie man den Router konfigurieren muss und welche DNS-Einstellungen beim Provider vorgenommen werden müssen.
-https://berripi.de/docker-portainer-traefik-wordpress-mariadb-auf-raspberry-pi/
+https://berripi.de/raspberry-pi-webserver-mit-traefik-und-tls-in-docker/
 
 Hier gibt es jetzt erst einmal nur die Abfolge der Befehle und wie mal die docker-compose.yml erstellt.
 
