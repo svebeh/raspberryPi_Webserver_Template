@@ -14,8 +14,8 @@ services:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./log/traefik:/log/traefik"
-      - "./traefik_data/traefik.yml:/traefik.yml"
-      - "./traefik_data/dynamic.yml:/dynamic.yml"
+      - "./traefikData/traefik.yml:/traefik.yml"
+      - "./traefikData/dynamic.yml:/dynamic.yml"
       - "/etc/localtime:/etc/localtime:ro"
 
 
